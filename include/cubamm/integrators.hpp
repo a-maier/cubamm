@@ -210,8 +210,8 @@ namespace cubamm{
   class Integrator;
 
   template<>
-  class Integrator<Cuhre> :
-    public detail::CommonParameters<Integrator<Cuhre>>
+  class Integrator<cuhre> :
+    public detail::CommonParameters<Integrator<cuhre>>
   {
   public:
     auto & key(int k){
@@ -246,7 +246,7 @@ namespace cubamm{
     ){
       auto data = detail::make_IntegrandData(std::move(f), std::make_tuple(r...));
       Result<double> res;
-      ::Cuhre(
+      Cuhre(
           sizeof...(r), 1,
           detail::as_cuba_integrand<decltype(data)>, &data, nvec(),
           epsrel(), epsabs(),
@@ -266,7 +266,7 @@ namespace cubamm{
     ){
       auto data = detail::make_IntegrandData(std::move(f), std::make_tuple(r...));
       Result<std::array<double, N>> res;
-      ::Cuhre(
+      Cuhre(
           sizeof...(r), N,
           detail::as_cuba_integrand<decltype(data)>, &data, nvec(),
           epsrel(), epsabs(),
@@ -287,7 +287,7 @@ namespace cubamm{
       auto data = detail::make_IntegrandData(std::move(f), std::make_tuple(r...));
       Result<std::complex<double>> res;
       std::array<double, 2> integral, error, prob;
-      ::Cuhre(
+      Cuhre(
           sizeof...(r), integral.size(),
           detail::as_cuba_integrand<decltype(data)>, &data, nvec(),
           epsrel(), epsabs(),
@@ -311,7 +311,7 @@ namespace cubamm{
       auto data = detail::make_IntegrandData(std::move(f), std::make_tuple(r...));
       Result<std::array<std::complex<double>, N>> res;
       std::array<double, 2*N> integral, error, prob;
-      ::Cuhre(
+      Cuhre(
           sizeof...(r), integral.size(),
           detail::as_cuba_integrand<decltype(data)>, &data, nvec(),
           epsrel(), epsabs(),

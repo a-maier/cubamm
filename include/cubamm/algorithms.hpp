@@ -2,9 +2,9 @@
 
 namespace cubamm{
   enum Algorithm{
-    Vegas,
-    Suave,
-    Divonne,
-    Cuhre
+    vegas,
+    suave,
+    divonne,
+    cuhre
   };
 }
