@@ -10,6 +10,9 @@
 #include "cuba.h"
 
 namespace cubamm{
+  enum SampleSpec{
+    last = 0, all = 1
+  };
 
   template<class ReturnType>
   struct Result{
@@ -22,6 +25,12 @@ namespace cubamm{
   };
 
   namespace detail{
+    void setbit(int & in, size_t bitno, bool value){
+      const int mask = 1 << bitno;
+      in ^= in & mask;
+      in |= value << bitno;
+    }
+
     template<class Derived>
     class CommonParameters{
     public:
@@ -61,6 +70,43 @@ namespace cubamm{
         spin_ = s;
         return *static_cast<Derived*>(this);
       }
+      auto & verbose(int level){
+        if(level < 0 || level > 3){
+          throw std::invalid_argument{
+            "verbosity level " + std::to_string(level) + " outside range [0,3]"
+          };
+        }
+        // clear first two bits
+        const int clearbits = flags_ & 3;
+        flags_ ^= clearbits;
+        flags_ |= level;
+        return *static_cast<Derived*>(this);
+      }
+      auto & samples(SampleSpec s){
+        setbit(flags_, 2, static_cast<bool>(s));
+        return *static_cast<Derived*>(this);
+      }
+      auto & pseudo_random(bool b){
+        if(! b){
+          seed_ = 0;
+        }
+        else{
+          seed_ = 1; // TODO: what does Cuba's MathLink do?
+          const int clearbits = flags_ & rng_lvl_bits();
+          flags_ ^= clearbits;
+        }
+        return *static_cast<Derived*>(this);
+      }
+      auto & pseudo_random(int level){
+        pseudo_random(true);
+        flags_ |= level << 8;
+        return *static_cast<Derived*>(this);
+      }
+      auto & retain_statefile(bool b){
+        setbit(flags_, 4, b);
+        return *static_cast<Derived*>(this);
+      }
+
       auto nvec() const{ return nvec_; }
       auto epsrel() const{ return epsrel_; }
       auto epsabs() const{ return epsabs_; }
@@ -70,17 +116,32 @@ namespace cubamm{
       auto maxeval() const{ return maxeval_; }
       char const * statefile() const{ return statefile_.get(); }
       auto spin() const{ return spin_; }
+      int verbose() const { return flags_ & 3; }
+      SampleSpec samples() const {
+        return static_cast<SampleSpec>(flags_ & (1 << 2));
+      }
+      bool retain_statefile() const {
+        return static_cast<bool>(flags_ & (1 << 4));
+      }
 
     protected:
       CommonParameters() = default;
     private:
       int nvec_ = 1;
-      double epsrel_ = 1e-6, epsabs_ = 1e-6;
       int flags_;
+      double epsrel_ = 1e-3, epsabs_ = 1e-12;
       int seed_;
-      int mineval_ = 1, maxeval_ = std::numeric_limits<int>::max();
+      int mineval_ = 0, maxeval_ = std::numeric_limits<int>::max();
       std::unique_ptr<char> statefile_ = nullptr;
       void * spin_ = nullptr;
+
+      static constexpr int rng_lvl_bits(){
+        int result = 0;
+        for(size_t i = 8u; i < 32u; ++i){
+          result |= 1 << i;
+        }
+        return result;
+      }
     };
 
     template<typename F, typename T>
@@ -237,6 +298,14 @@ namespace cubamm{
       return *this;
     }
     auto gridno() const{ return gridno_; }
+
+    auto & reset_state(bool b){
+      int f = flags();
+      detail::setbit(f, 5, b);
+      flags(f);
+      return *this;
+    }
+    auto reset_state() const{ return flags() & (1 << 5); }
 
     template<typename F, typename... Number>
     auto integrate(F f, Range<Number>... r){
@@ -397,8 +466,8 @@ namespace cubamm{
 
   private:
     int nnew_ = 1000;
-    int nmin_ = 0;
-    double flatness_ = 25.;
+    int nmin_ = 2;
+    double flatness_ = 50.;
 
     template<typename F, typename... Number>
     auto integrate(
