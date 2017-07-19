@@ -19,7 +19,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=c++14 -Wno-missing-br
 
 file(GLOB tst_files "${CMAKE_CURRENT_SOURCE_DIR}/t/*.cpp")
 set(inc_dir "${CMAKE_CURRENT_SOURCE_DIR}/include/")
-file(GLOB header_files "${inc_dir}/*/*.hpp")
 
 include_directories(${inc_dir})
 
@@ -30,7 +29,7 @@ foreach(tst ${tst_files})
   add_test("t_${tst_exe}" ${tst_exe})
 endforeach()
 
-install(FILES ${header_files} DESTINATION include/cubamm/)
+install(DIRECTORY "${inc_dir}/cubamm" DESTINATION include/)
 
 # build a CPack driven installer package
 include(InstallRequiredSystemLibraries)
