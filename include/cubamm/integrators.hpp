@@ -28,7 +28,7 @@
  */
 #pragma once
 
-#include "integrators/vegas.hpp"
-#include "integrators/suave.hpp"
-#include "integrators/divonne.hpp"
-#include "integrators/cuhre.hpp"
+#include "cubamm/integrators/vegas.hpp"
+#include "cubamm/integrators/suave.hpp"
+#include "cubamm/integrators/divonne.hpp"
+#include "cubamm/integrators/cuhre.hpp"
