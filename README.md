@@ -13,7 +13,7 @@ Alternatively, you can use [cmake](https://cmake.org/). For this, go to
 the source directory and run
 
 ``` shell
-make build
+mkdir build
 cd build
 cmake .. -DCMAKE_INSTALL_PREFIX=/some/path/
 make install
