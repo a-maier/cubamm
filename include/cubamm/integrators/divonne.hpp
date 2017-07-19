@@ -4,7 +4,82 @@
 
 #include "cuba.h"
 
+#include <vector>
+
+#if __cplusplus > 201402L
+#include <any>
+#else
+#include <boost/any.hpp>
+#endif
+
 namespace cubamm{
+#if __cplusplus > 201402L
+  using any = std::any;
+  using std::any_cast;
+#else
+  using any = boost::any;
+  using boost::any_cast;
+#endif
+
+  namespace detail{
+    double rel_point(
+        double x, Range<double> const & r
+    ){
+      return (x - r.start)/(r.end-r.start);
+    }
+
+    double rel_point(
+        std::complex<double> const & x, Range<std::complex<double>> const & r
+    ){
+      const std::complex<double> result = (x - r.start)/(r.end-r.start);
+      return real(result);
+    }
+
+    template<typename... T, size_t... indices>
+    std::array<double, sizeof...(T)> to_cuba_coordinates(
+        std::tuple<T...> const & point,
+        std::tuple<Range<T>...> const & transform_range,
+        std::index_sequence<indices...>
+    ){
+      return {
+        rel_point(
+            std::get<indices>(point), std::get<indices>(transform_range)
+        )...
+      };
+    }
+
+    template<typename... T>
+    std::array<double, sizeof...(T)> to_cuba_coordinates(
+        std::tuple<T...> const & point,
+        std::tuple<Range<T>...> const & transform_range
+    ){
+      static_assert(point.size() == transform_range.size(), "compatible size");
+      return point_to_cuba_coordinates(
+          point, transform_range, std::index_sequence_for<T...>{}
+      );
+    }
+
+    template<typename... T>
+    auto to_cuba_coordinates(
+        std::vector<any> const & points,
+        std::tuple<Range<T>...> const & transform_ranges
+    ){
+      using CubaCoordinate = std::array<double, sizeof...(T)>;
+      std::vector<CubaCoordinate> cuba_coordinates(points.size());
+      std::transform(
+          begin(points), end(points),
+          begin(cuba_coordinates),
+          [transform_ranges](any const & point){
+            return point_to_cuba_coordinates(
+                any_cast<std::tuple<T...>>(point),
+                transform_ranges
+            );
+          }
+      );
+      return cuba_coordinates;
+    }
+
+  }
 
   template<>
   class Integrator<divonne> :
@@ -53,6 +128,18 @@ namespace cubamm{
     }
     auto min_deviation() const{ return min_deviation_; }
 
+    template<typename... T>
+    auto & given(std::vector<std::tuple<T...>> t){
+      known_peaks_ = std::move(t);
+      return *this;
+    }
+
+    template<typename InputIterator>
+    auto & given(InputIterator first, InputIterator last){
+      known_peaks_.assign(first, last);
+      return *this;
+    }
+
     template<typename F, typename... Number>
     auto integrate(F f, Range<Number>... r){
       using ReturnType = decltype(f(r.start...));
@@ -70,6 +157,7 @@ namespace cubamm{
     }
 
   private:
+
     int key1_ = 47;
     int key2_ = 1;
     int key3_ = 1;
@@ -77,6 +165,7 @@ namespace cubamm{
     double border_ = 0.;
     double max_chisq_ = 10.;
     double min_deviation_ = 25.;
+    std::vector<any> known_peaks_;
 
     template<typename F, typename... Number>
     auto integrate(
@@ -85,6 +174,9 @@ namespace cubamm{
     ){
       auto data = detail::make_IntegrandData(std::move(f), std::make_tuple(r...));
       Result<double> res;
+      const auto peaks = detail::to_cuba_coordinates(
+          known_peaks_, data.ranges
+      );
       Divonne(
           sizeof...(r), 1,
           detail::as_cuba_integrand<decltype(data)>, &data, nvec(),
@@ -94,7 +186,7 @@ namespace cubamm{
           key1(), key2(), key3(),
           max_pass(), border(),
           max_chisq(), min_deviation(),
-          0, 0, nullptr,
+          peaks.size(), sizeof...(r), peaks.data(),
           0, nullptr,
           statefile(), spin(),
           &res.nregions, &res.neval, &res.fail,
@@ -110,6 +202,9 @@ namespace cubamm{
     ){
       auto data = detail::make_IntegrandData(std::move(f), std::make_tuple(r...));
       Result<std::array<double, N>> res;
+      const auto peaks = detail::to_cuba_coordinates(
+          known_peaks_, data.ranges
+      );
       Divonne(
           sizeof...(r), N,
           detail::as_cuba_integrand<decltype(data)>, &data, nvec(),
@@ -119,7 +214,7 @@ namespace cubamm{
           key1(), key2(), key3(),
           max_pass(), border(),
           max_chisq(), min_deviation(),
-          0, 0, nullptr,
+          peaks.size(), sizeof...(r), peaks.data(),
           0, nullptr,
           statefile(), spin(),
           &res.nregions, &res.neval, &res.fail,
@@ -136,6 +231,9 @@ namespace cubamm{
       auto data = detail::make_IntegrandData(std::move(f), std::make_tuple(r...));
       Result<std::complex<double>> res;
       std::array<double, 2> integral, error, prob;
+      const auto peaks = detail::to_cuba_coordinates(
+          known_peaks_, data.ranges
+      );
       Divonne(
           sizeof...(r), integral.size(),
           detail::as_cuba_integrand<decltype(data)>, &data, nvec(),
@@ -145,7 +243,7 @@ namespace cubamm{
           key1(), key2(), key3(),
           max_pass(), border(),
           max_chisq(), min_deviation(),
-          0, 0, nullptr,
+          peaks.size(), sizeof...(r), peaks.data(),
           0, nullptr,
           statefile(), spin(),
           &res.nregions, &res.neval, &res.fail,
@@ -165,6 +263,9 @@ namespace cubamm{
       auto data = detail::make_IntegrandData(std::move(f), std::make_tuple(r...));
       Result<std::array<std::complex<double>, N>> res;
       std::array<double, 2*N> integral, error, prob;
+      const auto peaks = detail::to_cuba_coordinates(
+          known_peaks_, data.ranges
+      );
       Divonne(
           sizeof...(r), integral.size(),
           detail::as_cuba_integrand<decltype(data)>, &data, nvec(),
@@ -174,7 +275,7 @@ namespace cubamm{
           key1(), key2(), key3(),
           max_pass(), border(),
           max_chisq(), min_deviation(),
-          0, 0, nullptr,
+          peaks.size(), sizeof...(r), peaks.data(),
           0, nullptr,
           statefile(), spin(),
           &res.nregions, &res.neval, &res.fail,
